@@ -1,0 +1,1008 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cycle Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d0f12;
+    --bg2: #141619;
+    --bg3: #1c1f24;
+    --bg4: #242830;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.13);
+    --text: #e8eaf0;
+    --text2: #8b909e;
+    --text3: #555a66;
+    --accent-lgd: #3ee8a0;
+    --accent-lgd-dim: rgba(62,232,160,0.12);
+    --accent-enc: #4eb3f7;
+    --accent-enc-dim: rgba(78,179,247,0.12);
+    --accent-both: #a78bfa;
+    --accent-both-dim: rgba(167,139,250,0.12);
+    --danger: #f87171;
+    --warn: #fbbf24;
+    --radius: 10px;
+    --radius-lg: 16px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'DM Mono', monospace;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+  h1, h2, h3, .display { font-family: 'Syne', sans-serif; }
+
+  /* Layout */
+  .app { display: grid; grid-template-columns: 260px 1fr; min-height: 100vh; }
+  .sidebar {
+    background: var(--bg2);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    padding: 24px 16px;
+    gap: 20px;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+  }
+  .main { padding: 28px 32px; max-width: 900px; }
+
+  /* Logo / header */
+  .logo { padding: 0 8px 8px; border-bottom: 1px solid var(--border); }
+  .logo-title { font-family: 'Syne', sans-serif; font-size: 17px; font-weight: 700; color: var(--text); }
+  .logo-sub { font-size: 10px; color: var(--text3); letter-spacing: 0.1em; text-transform: uppercase; margin-top: 2px; }
+
+  /* Compound pills */
+  .compounds { display: flex; flex-direction: column; gap: 8px; }
+  .compound-pill {
+    border-radius: var(--radius);
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border: 1px solid var(--border);
+  }
+  .compound-pill.lgd { background: var(--accent-lgd-dim); border-color: rgba(62,232,160,0.2); }
+  .compound-pill.enc { background: var(--accent-enc-dim); border-color: rgba(78,179,247,0.2); }
+  .compound-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .lgd .compound-dot { background: var(--accent-lgd); }
+  .enc .compound-dot { background: var(--accent-enc); }
+  .compound-info {}
+  .compound-name { font-family: 'Syne', sans-serif; font-size: 12px; font-weight: 600; }
+  .lgd .compound-name { color: var(--accent-lgd); }
+  .enc .compound-name { color: var(--accent-enc); }
+  .compound-dose { font-size: 11px; color: var(--text2); }
+
+  /* Progress rings */
+  .progress-section { display: flex; flex-direction: column; gap: 8px; }
+  .progress-block { background: var(--bg3); border-radius: var(--radius); padding: 12px; border: 1px solid var(--border); }
+  .progress-label { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; }
+  .progress-bar-wrap { height: 4px; background: var(--bg4); border-radius: 2px; overflow: hidden; }
+  .progress-bar { height: 100%; border-radius: 2px; transition: width 0.6s ease; }
+  .progress-bar.lgd { background: var(--accent-lgd); }
+  .progress-bar.enc { background: var(--accent-enc); }
+  .progress-numbers { display: flex; justify-content: space-between; margin-top: 6px; }
+  .progress-current { font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 700; }
+  .lgd .progress-current { color: var(--accent-lgd); }
+  .enc .progress-current { color: var(--accent-enc); }
+  .progress-total { font-size: 11px; color: var(--text3); align-self: flex-end; }
+
+  /* Sidebar nav */
+  .nav { display: flex; flex-direction: column; gap: 2px; }
+  .nav-item {
+    padding: 8px 12px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    color: var(--text2);
+    transition: all 0.15s;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border: none;
+    background: none;
+    width: 100%;
+    text-align: left;
+  }
+  .nav-item:hover { background: var(--bg3); color: var(--text); }
+  .nav-item.active { background: var(--bg4); color: var(--text); }
+  .nav-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text3); flex-shrink: 0; }
+  .nav-item.active .nav-dot { background: var(--accent-lgd); }
+
+  /* Today card */
+  .today-hero {
+    background: var(--bg2);
+    border: 1px solid var(--border2);
+    border-radius: var(--radius-lg);
+    padding: 28px;
+    margin-bottom: 24px;
+    position: relative;
+    overflow: hidden;
+  }
+  .today-hero::before {
+    content: '';
+    position: absolute;
+    top: -60px; right: -60px;
+    width: 200px; height: 200px;
+    background: radial-gradient(circle, rgba(62,232,160,0.07) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .today-date { font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 4px; }
+  .today-day { font-family: 'Syne', sans-serif; font-size: 32px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+  .today-phase { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; font-family: 'Syne', sans-serif; margin-bottom: 20px; }
+  .phase-oncycle { background: var(--accent-lgd-dim); color: var(--accent-lgd); border: 1px solid rgba(62,232,160,0.3); }
+  .phase-pct { background: var(--accent-enc-dim); color: var(--accent-enc); border: 1px solid rgba(78,179,247,0.3); }
+  .phase-done { background: var(--accent-both-dim); color: var(--accent-both); border: 1px solid rgba(167,139,250,0.3); }
+
+  /* Dosing checklist */
+  .dose-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
+  .dose-item {
+    display: flex; align-items: center; gap: 12px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    cursor: pointer;
+    transition: all 0.15s;
+    user-select: none;
+  }
+  .dose-item:hover { border-color: var(--border2); }
+  .dose-item.checked { border-color: rgba(62,232,160,0.25); background: rgba(62,232,160,0.05); }
+  .dose-item.checked.enc-item { border-color: rgba(78,179,247,0.25); background: rgba(78,179,247,0.05); }
+  .dose-checkbox {
+    width: 20px; height: 20px; border-radius: 6px;
+    border: 1px solid var(--border2);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; transition: all 0.15s;
+    font-size: 12px;
+  }
+  .dose-item.checked .dose-checkbox { background: var(--accent-lgd); border-color: var(--accent-lgd); color: #0d0f12; }
+  .dose-item.checked.enc-item .dose-checkbox { background: var(--accent-enc); border-color: var(--accent-enc); color: #0d0f12; }
+  .dose-name { font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 600; }
+  .dose-detail { font-size: 11px; color: var(--text2); margin-top: 1px; }
+
+  /* Check-in button */
+  .checkin-btn {
+    width: 100%;
+    padding: 14px;
+    border-radius: var(--radius);
+    border: none;
+    font-family: 'Syne', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.03em;
+  }
+  .checkin-btn.ready { background: var(--accent-lgd); color: #0d0f12; }
+  .checkin-btn.ready:hover { opacity: 0.9; transform: translateY(-1px); }
+  .checkin-btn.done { background: var(--bg4); color: var(--text2); cursor: default; border: 1px solid var(--border); }
+  .checkin-btn.incomplete { background: var(--bg4); color: var(--text2); cursor: not-allowed; border: 1px solid var(--border); }
+
+  /* Notes & photo section */
+  .log-section { margin-top: 24px; display: flex; flex-direction: column; gap: 16px; }
+  .section-title { font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 10px; }
+  .log-textarea {
+    width: 100%;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    line-height: 1.7;
+    resize: vertical;
+    min-height: 80px;
+    transition: border-color 0.15s;
+    outline: none;
+  }
+  .log-textarea:focus { border-color: var(--border2); }
+  .log-textarea::placeholder { color: var(--text3); }
+
+  /* Photo upload */
+  .photo-zone {
+    border: 1px dashed var(--border2);
+    border-radius: var(--radius);
+    padding: 16px;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-align: center;
+    background: var(--bg2);
+  }
+  .photo-zone:hover { border-color: var(--accent-lgd); background: var(--accent-lgd-dim); }
+  .photo-zone-text { color: var(--text3); font-size: 12px; }
+  .photo-zone-text span { color: var(--accent-lgd); }
+  #photo-input { display: none; }
+  .photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 8px; margin-top: 10px; }
+  .photo-thumb {
+    aspect-ratio: 1;
+    border-radius: var(--radius);
+    overflow: hidden;
+    position: relative;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+  }
+  .photo-thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .photo-thumb .remove-photo {
+    position: absolute; top: 4px; right: 4px;
+    width: 18px; height: 18px;
+    background: rgba(0,0,0,0.7);
+    border-radius: 50%;
+    border: none; cursor: pointer;
+    color: white; font-size: 10px;
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; transition: opacity 0.15s;
+  }
+  .photo-thumb:hover .remove-photo { opacity: 1; }
+
+  /* Save log btn */
+  .save-btn {
+    padding: 10px 20px;
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    align-self: flex-end;
+  }
+  .save-btn:hover { background: var(--bg4); border-color: var(--accent-lgd); color: var(--accent-lgd); }
+
+  /* Calendar view */
+  .calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+    margin-top: 10px;
+  }
+  .cal-header { text-align: center; font-size: 10px; color: var(--text3); padding: 4px; text-transform: uppercase; letter-spacing: 0.08em; }
+  .cal-day {
+    aspect-ratio: 1;
+    border-radius: 6px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all 0.15s;
+    background: var(--bg3);
+    position: relative;
+    gap: 2px;
+  }
+  .cal-day.empty { background: transparent; cursor: default; border: none; }
+  .cal-day.today { border-color: var(--border2); }
+  .cal-day.checked-in { background: rgba(62,232,160,0.12); border-color: rgba(62,232,160,0.25); }
+  .cal-day.checked-in .cal-num { color: var(--accent-lgd); }
+  .cal-day:hover:not(.empty) { border-color: var(--border2); }
+  .cal-num { font-family: 'Syne', sans-serif; font-size: 12px; font-weight: 600; }
+  .cal-dots { display: flex; gap: 2px; }
+  .cal-dot { width: 4px; height: 4px; border-radius: 50%; }
+
+  /* History list */
+  .history-list { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+  .history-entry {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  .history-entry:hover { border-color: var(--border2); }
+  .history-top { display: flex; align-items: center; justify-content: space-between; }
+  .history-day { font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 600; }
+  .history-date { font-size: 11px; color: var(--text3); }
+  .history-note { font-size: 12px; color: var(--text2); margin-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .history-photos-row { display: flex; gap: 6px; margin-top: 8px; }
+  .history-photo-thumb { width: 40px; height: 40px; border-radius: 6px; overflow: hidden; object-fit: cover; }
+
+  /* Detail modal overlay */
+  .modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.75);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    padding: 20px;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--bg2);
+    border: 1px solid var(--border2);
+    border-radius: var(--radius-lg);
+    padding: 28px;
+    max-width: 520px;
+    width: 100%;
+    max-height: 80vh;
+    overflow-y: auto;
+  }
+  .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+  .modal-title { font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 700; }
+  .modal-close { background: var(--bg4); border: none; color: var(--text2); width: 28px; height: 28px; border-radius: 6px; cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center; }
+  .modal-close:hover { color: var(--text); }
+  .modal-note { font-size: 13px; color: var(--text2); line-height: 1.7; }
+  .modal-photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; margin-top: 16px; }
+  .modal-photo { border-radius: var(--radius); overflow: hidden; aspect-ratio: 1; }
+  .modal-photo img { width: 100%; height: 100%; object-fit: cover; }
+
+  /* Tab navigation */
+  .tabs { display: flex; gap: 4px; margin-bottom: 24px; background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 4px; width: fit-content; }
+  .tab-btn {
+    padding: 6px 16px;
+    border-radius: 7px;
+    border: none;
+    background: transparent;
+    color: var(--text2);
+    font-family: 'Syne', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .tab-btn.active { background: var(--bg4); color: var(--text); }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* Reminder toast */
+  .toast {
+    position: fixed; bottom: 24px; right: 24px;
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    display: flex; align-items: center; gap: 12px;
+    z-index: 200;
+    transform: translateY(100px);
+    opacity: 0;
+    transition: all 0.3s ease;
+    max-width: 300px;
+  }
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast-icon { font-size: 18px; }
+  .toast-text { font-size: 12px; color: var(--text); }
+  .toast-close { background: none; border: none; color: var(--text3); cursor: pointer; font-size: 14px; margin-left: auto; }
+
+  /* Streak */
+  .streak-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--bg4);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 4px 12px;
+    font-size: 12px;
+    color: var(--warn);
+    font-family: 'Syne', sans-serif;
+    font-weight: 600;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+  /* Tag badges */
+  .tag { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; font-family: 'Syne', sans-serif; text-transform: uppercase; letter-spacing: 0.06em; }
+  .tag-lgd { background: var(--accent-lgd-dim); color: var(--accent-lgd); }
+  .tag-enc { background: var(--accent-enc-dim); color: var(--accent-enc); }
+
+  .empty-state { text-align: center; padding: 40px 20px; color: var(--text3); }
+  .empty-state-icon { font-size: 32px; margin-bottom: 10px; }
+
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+  .fade-in { animation: fadeIn 0.3s ease forwards; }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="logo">
+      <div class="logo-title">CycleLog</div>
+      <div class="logo-sub">LGD 60d + Enclo from day 30</div>
+    </div>
+
+    <div class="compounds">
+      <div class="compound-pill lgd">
+        <div class="compound-dot"></div>
+        <div class="compound-info">
+          <div class="compound-name">LGD-4033</div>
+          <div class="compound-dose">7.5 mg/day · 60 days</div>
+        </div>
+      </div>
+      <div class="compound-pill enc">
+        <div class="compound-dot"></div>
+        <div class="compound-info">
+          <div class="compound-name">Enclomiphene</div>
+          <div class="compound-dose">25 mg/day · starts day 30 · 40 tabs</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="progress-section">
+      <div class="progress-block lgd">
+        <div class="progress-label">LGD-4033 Supply</div>
+        <div class="progress-bar-wrap">
+          <div class="progress-bar lgd" id="lgd-bar" style="width:0%"></div>
+        </div>
+        <div class="progress-numbers">
+          <div class="progress-current" id="lgd-days-left">—</div>
+          <div class="progress-total">/ 30 days</div>
+        </div>
+      </div>
+      <div class="progress-block enc">
+        <div class="progress-label">Enclomiphene Supply</div>
+        <div class="progress-bar-wrap">
+          <div class="progress-bar enc" id="enc-bar" style="width:0%"></div>
+        </div>
+        <div class="progress-numbers">
+          <div class="progress-current" id="enc-days-left">—</div>
+          <div class="progress-total">/ 40 days</div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="streak-badge" id="streak-badge">🔥 0 day streak</div>
+    </div>
+
+    <nav class="nav">
+      <button class="nav-item active" onclick="showPage('today')">
+        <div class="nav-dot"></div> Today
+      </button>
+      <button class="nav-item" onclick="showPage('calendar')">
+        <div class="nav-dot"></div> Calendar
+      </button>
+      <button class="nav-item" onclick="showPage('history')">
+        <div class="nav-dot"></div> Log History
+      </button>
+      <button class="nav-item" onclick="showPage('settings')">
+        <div class="nav-dot"></div> Settings
+      </button>
+    </nav>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+
+    <!-- TODAY PAGE -->
+    <div id="page-today" class="tab-content active fade-in">
+      <div class="today-hero">
+        <div class="today-date" id="hero-date"></div>
+        <div class="today-day" id="hero-day-label"></div>
+        <div id="phase-badge"></div>
+
+        <div class="dose-list" id="dose-list"></div>
+
+        <button class="checkin-btn incomplete" id="checkin-btn" onclick="doCheckin()">
+          Check in for today
+        </button>
+      </div>
+
+      <div class="log-section">
+        <div>
+          <div class="section-title">Today's notes</div>
+          <textarea class="log-textarea" id="today-notes" placeholder="How are you feeling? Energy, mood, sleep, side effects..."></textarea>
+        </div>
+        <div>
+          <div class="section-title">Progress photos</div>
+          <div class="photo-zone" onclick="document.getElementById('photo-input').click()">
+            <div class="photo-zone-text">📷 <span>Click to add photos</span></div>
+          </div>
+          <input type="file" id="photo-input" accept="image/*" multiple onchange="addPhotos(event)">
+          <div class="photo-grid" id="today-photos"></div>
+        </div>
+        <button class="save-btn" onclick="saveLog()">Save log entry →</button>
+      </div>
+    </div>
+
+    <!-- CALENDAR PAGE -->
+    <div id="page-calendar" class="tab-content">
+      <div class="section-title" style="margin-bottom:16px;">Cycle calendar</div>
+      <div class="calendar-grid" id="calendar-grid">
+        <div class="cal-header">Mon</div>
+        <div class="cal-header">Tue</div>
+        <div class="cal-header">Wed</div>
+        <div class="cal-header">Thu</div>
+        <div class="cal-header">Fri</div>
+        <div class="cal-header">Sat</div>
+        <div class="cal-header">Sun</div>
+      </div>
+    </div>
+
+    <!-- HISTORY PAGE -->
+    <div id="page-history" class="tab-content">
+      <div class="section-title" style="margin-bottom:16px;">Log history</div>
+      <div class="history-list" id="history-list">
+        <div class="empty-state">
+          <div class="empty-state-icon">📋</div>
+          No entries yet. Check in today to start your log.
+        </div>
+      </div>
+    </div>
+
+    <!-- SETTINGS PAGE -->
+    <div id="page-settings" class="tab-content">
+      <div class="section-title" style="margin-bottom:20px;">Settings</div>
+      <div style="display:flex;flex-direction:column;gap:16px;max-width:420px;">
+        <div class="progress-block" style="display:flex;flex-direction:column;gap:10px;">
+          <div style="font-family:'Syne',sans-serif;font-size:13px;font-weight:600;">Cycle start date</div>
+          <input type="date" id="start-date-input" style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius);padding:8px 12px;color:var(--text);font-family:'DM Mono',monospace;font-size:13px;outline:none;width:100%;">
+          <button class="save-btn" style="align-self:flex-start;" onclick="saveStartDate()">Set start date →</button>
+        </div>
+        <div class="progress-block">
+          <div style="font-family:'Syne',sans-serif;font-size:13px;font-weight:600;margin-bottom:8px;">Protocol summary</div>
+          <div style="font-size:12px;color:var(--text2);line-height:1.8;">
+            <span class="tag tag-lgd">LGD</span> Days 1–60: 7.5 mg/day<br>
+            <span class="tag tag-enc">Enclo</span> Days 30–69: 25 mg/day (starts day 30)<br>
+            Total cycle: 69 days
+          </div>
+        </div>
+        <div class="progress-block">
+          <div style="font-family:'Syne',sans-serif;font-size:13px;font-weight:600;margin-bottom:8px;">Data</div>
+          <button class="save-btn" onclick="exportData()">Export log data →</button>
+          &nbsp;
+          <button class="save-btn" style="color:var(--danger);border-color:rgba(248,113,113,0.3);" onclick="clearData()">Clear all data</button>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- Detail Modal -->
+<div class="modal-overlay" id="detail-modal" onclick="closeModal(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-title">Day —</div>
+      <button class="modal-close" onclick="closeModalBtn()">✕</button>
+    </div>
+    <div id="modal-body"></div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast">
+  <span class="toast-icon" id="toast-icon">💊</span>
+  <div class="toast-text" id="toast-text">Time for your daily dose!</div>
+  <button class="toast-close" onclick="dismissToast()">✕</button>
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+const STATE_KEY = 'cycletracker_v2';
+let state = {
+  startDate: null,
+  logs: {}
+};
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STATE_KEY);
+    if (raw) state = JSON.parse(raw);
+  } catch(e) {}
+}
+
+function saveState() {
+  localStorage.setItem(STATE_KEY, JSON.stringify(state));
+}
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+function localDateStr(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return y + '-' + m + '-' + day;
+}
+
+function todayKey() {
+  return localDateStr(new Date());
+}
+
+function dateKey(d) {
+  return localDateStr(d);
+}
+
+function cycleDay(key) {
+  if (!state.startDate) return null;
+  const sp = state.startDate.split('-').map(Number);
+  const kp = key.split('-').map(Number);
+  const start = new Date(sp[0], sp[1] - 1, sp[2]);
+  const target = new Date(kp[0], kp[1] - 1, kp[2]);
+  const diff = Math.floor((target - start) / 86400000) + 1;
+  return diff;
+}
+
+// Protocol: LGD days 1-60 (7.5mg), Enclomiphene days 30-69 (25mg), total 69 days
+function phaseFor(day) {
+  if (day === null || day < 1) return null;
+  if (day <= 29) return 'lgd-only';      // Days 1-29: LGD only
+  if (day <= 60) return 'on-lgd-enc';   // Days 30-60: LGD + Enclo overlap
+  if (day <= 69) return 'enc-only';     // Days 61-69: Enclo PCT only
+  return 'done';
+}
+
+function phaseName(phase) {
+  if (phase === 'lgd-only') return 'LGD Only — 7.5 mg';
+  if (phase === 'on-lgd-enc') return 'LGD + Enclomiphene';
+  if (phase === 'enc-only') return 'PCT — Enclomiphene Only';
+  if (phase === 'done') return 'Cycle Complete 🎉';
+  return 'Pre-cycle';
+}
+
+function phaseClass(phase) {
+  if (phase === 'lgd-only') return 'phase-oncycle';
+  if (phase === 'on-lgd-enc') return 'phase-oncycle';
+  if (phase === 'enc-only') return 'phase-pct';
+  if (phase === 'done') return 'phase-done';
+  return 'phase-done';
+}
+
+function compoundsForDay(day) {
+  if (day === null || day < 1) return [];
+  if (day <= 29) return ['LGD-4033 · 7.5 mg'];                            // Days 1-29: LGD only
+  if (day <= 60) return ['LGD-4033 · 7.5 mg', 'Enclomiphene · 25 mg'];   // Days 30-60: both
+  if (day <= 69) return ['Enclomiphene · 25 mg'];                         // Days 61-69: Enclo only
+  return [];
+}
+
+// ── Today Page ───────────────────────────────────────────────────────────────
+function renderToday() {
+  const key = todayKey();
+  const log = state.logs[key] || {};
+  const day = cycleDay(key);
+  const phase = phaseFor(day);
+  const compounds = compoundsForDay(day);
+
+  // Date header
+  const now = new Date();
+  document.getElementById('hero-date').textContent = now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  document.getElementById('hero-day-label').textContent = day ? `Day ${day} of 69` : 'Not started — set date in Settings';
+
+  // Phase badge
+  const badge = document.getElementById('phase-badge');
+  if (phase) {
+    badge.innerHTML = `<div class="today-phase ${phaseClass(phase)}">${phaseName(phase)}</div>`;
+  } else {
+    badge.innerHTML = `<div class="today-phase phase-done">Set your start date in Settings</div>`;
+  }
+
+  // Dose checklist
+  const doseList = document.getElementById('dose-list');
+  doseList.innerHTML = '';
+  const checkedDoses = log.doses || {};
+  compounds.forEach((c, i) => {
+    const isEnc = c.includes('Enclo');
+    const checked = checkedDoses[c];
+    const item = document.createElement('div');
+    item.className = `dose-item ${isEnc ? 'enc-item' : ''} ${checked ? 'checked' : ''}`;
+    item.innerHTML = `
+      <div class="dose-checkbox">${checked ? '✓' : ''}</div>
+      <div>
+        <div class="dose-name">${c.split(' · ')[0]}</div>
+        <div class="dose-detail">${c.split(' · ')[1]} — ${isEnc ? 'once daily with food' : 'once daily'}</div>
+      </div>
+    `;
+    item.onclick = () => toggleDose(c, item, isEnc);
+    doseList.appendChild(item);
+  });
+
+  // Check-in button
+  const btn = document.getElementById('checkin-btn');
+  if (log.checkedIn) {
+    btn.textContent = '✓ Checked in for today';
+    btn.className = 'checkin-btn done';
+  } else {
+    const allChecked = compounds.length === 0 || compounds.every(c => checkedDoses[c]);
+    btn.textContent = compounds.length === 0 ? 'Set start date first' : (allChecked ? 'Check in for today →' : 'Mark doses taken to check in');
+    btn.className = `checkin-btn ${allChecked && compounds.length > 0 ? 'ready' : 'incomplete'}`;
+  }
+
+  // Restore notes
+  document.getElementById('today-notes').value = log.notes || '';
+
+  // Restore photos
+  renderTodayPhotos(log.photos || []);
+
+  // Progress bars
+  renderProgress();
+  renderStreak();
+}
+
+function toggleDose(compound, el, isEnc) {
+  const key = todayKey();
+  if (!state.logs[key]) state.logs[key] = { doses: {}, photos: [] };
+  if (!state.logs[key].doses) state.logs[key].doses = {};
+  state.logs[key].doses[compound] = !state.logs[key].doses[compound];
+  saveState();
+  renderToday();
+}
+
+function doCheckin() {
+  const key = todayKey();
+  const log = state.logs[key] || {};
+  const day = cycleDay(key);
+  const compounds = compoundsForDay(day);
+  const allChecked = compounds.length === 0 || compounds.every(c => (log.doses || {})[c]);
+  if (!allChecked || compounds.length === 0) return;
+  if (log.checkedIn) return;
+
+  if (!state.logs[key]) state.logs[key] = { doses: {}, photos: [] };
+  state.logs[key].checkedIn = true;
+  state.logs[key].checkinTime = new Date().toISOString();
+  saveState();
+  showToast('✅', 'Checked in! Keep it consistent.');
+  renderToday();
+}
+
+// ── Photos ───────────────────────────────────────────────────────────────────
+let pendingPhotos = []; // base64 array for today
+
+function addPhotos(e) {
+  const files = Array.from(e.target.files);
+  files.forEach(f => {
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const key = todayKey();
+      if (!state.logs[key]) state.logs[key] = { doses: {}, photos: [] };
+      if (!state.logs[key].photos) state.logs[key].photos = [];
+      state.logs[key].photos.push(ev.target.result);
+      saveState();
+      renderTodayPhotos(state.logs[key].photos);
+    };
+    reader.readAsDataURL(f);
+  });
+  e.target.value = '';
+}
+
+function renderTodayPhotos(photos) {
+  const grid = document.getElementById('today-photos');
+  grid.innerHTML = '';
+  (photos || []).forEach((src, i) => {
+    const div = document.createElement('div');
+    div.className = 'photo-thumb';
+    div.innerHTML = `<img src="${src}" alt="photo ${i+1}"><button class="remove-photo" onclick="removePhoto(${i})">✕</button>`;
+    grid.appendChild(div);
+  });
+}
+
+function removePhoto(idx) {
+  const key = todayKey();
+  state.logs[key].photos.splice(idx, 1);
+  saveState();
+  renderTodayPhotos(state.logs[key].photos);
+}
+
+function saveLog() {
+  const key = todayKey();
+  if (!state.logs[key]) state.logs[key] = { doses: {}, photos: [] };
+  state.logs[key].notes = document.getElementById('today-notes').value;
+  saveState();
+  showToast('💾', 'Log saved.');
+  renderHistory();
+}
+
+// ── Progress ─────────────────────────────────────────────────────────────────
+function renderProgress() {
+  const key = todayKey();
+  const day = cycleDay(key);
+  const d = day || 0;
+
+  const lgdDay = Math.min(Math.max(d, 0), 60);
+  // Enclo starts day 30, so enclo progress = days since day 30, capped at 40
+  const encDay = Math.min(Math.max(d - 29, 0), 40);
+
+  document.getElementById('lgd-days-left').textContent = `Day ${lgdDay}`;
+  document.getElementById('enc-days-left').textContent = `Day ${encDay}`;
+  document.getElementById('lgd-bar').style.width = `${(lgdDay / 60) * 100}%`;
+  document.getElementById('enc-bar').style.width = `${(encDay / 40) * 100}%`;
+}
+
+function renderStreak() {
+  let streak = 0;
+  const keys = Object.keys(state.logs).sort().reverse();
+  for (const k of keys) {
+    if (state.logs[k].checkedIn) streak++;
+    else break;
+  }
+  document.getElementById('streak-badge').textContent = `🔥 ${streak} day streak`;
+}
+
+// ── Calendar ─────────────────────────────────────────────────────────────────
+function renderCalendar() {
+  const grid = document.getElementById('calendar-grid');
+  // keep headers
+  while (grid.children.length > 7) grid.removeChild(grid.lastChild);
+
+  if (!state.startDate) {
+    const msg = document.createElement('div');
+    msg.style.cssText = 'grid-column:1/-1;color:var(--text3);padding:20px;text-align:center;font-size:12px;';
+    msg.textContent = 'Set your start date in Settings to see the calendar.';
+    grid.appendChild(msg);
+    return;
+  }
+
+  const start = new Date(state.startDate);
+  // Adjust to Monday-based week
+  let dayOfWeek = start.getDay(); // 0=Sun
+  dayOfWeek = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Mon=0
+
+  for (let i = 0; i < dayOfWeek; i++) {
+    const empty = document.createElement('div');
+    empty.className = 'cal-day empty';
+    grid.appendChild(empty);
+  }
+
+  for (let d = 1; d <= 69; d++) {
+    const date = new Date(start.getFullYear(), start.getMonth(), start.getDate() + d - 1);
+    const key = dateKey(date);
+    const log = state.logs[key] || {};
+    const isToday = key === todayKey();
+
+    const cell = document.createElement('div');
+    cell.className = `cal-day${isToday ? ' today' : ''}${log.checkedIn ? ' checked-in' : ''}`;
+    cell.title = `Day ${d} — ${date.toLocaleDateString()}`;
+
+    const dots = [];
+    if (d <= 60) dots.push(`<div class="cal-dot" style="background:var(--accent-lgd);"></div>`);
+    if (d >= 30 && d <= 69) dots.push(`<div class="cal-dot" style="background:var(--accent-enc);"></div>`);
+
+    cell.innerHTML = `<div class="cal-num">${d}</div><div class="cal-dots">${dots.join('')}</div>`;
+    cell.onclick = () => openDayDetail(key, d);
+    grid.appendChild(cell);
+  }
+}
+
+// ── History ───────────────────────────────────────────────────────────────────
+function renderHistory() {
+  const list = document.getElementById('history-list');
+  const entries = Object.entries(state.logs)
+    .filter(([k, v]) => v.checkedIn || v.notes || (v.photos && v.photos.length))
+    .sort(([a], [b]) => b.localeCompare(a));
+
+  if (!entries.length) {
+    list.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📋</div>No entries yet. Check in today to start your log.</div>';
+    return;
+  }
+
+  list.innerHTML = '';
+  entries.forEach(([key, log]) => {
+    const day = cycleDay(key);
+    const d = new Date(key);
+    const item = document.createElement('div');
+    item.className = 'history-entry';
+    const photos = log.photos || [];
+    const photoRow = photos.length ? `<div class="history-photos-row">${photos.slice(0,5).map(src => `<img class="history-photo-thumb" src="${src}">`).join('')}${photos.length > 5 ? `<div style="width:40px;height:40px;border-radius:6px;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--text3);">+${photos.length-5}</div>` : ''}</div>` : '';
+    item.innerHTML = `
+      <div class="history-top">
+        <div class="history-day">Day ${day || '?'}</div>
+        <div class="history-date">${d.toLocaleDateString('en-GB', {day:'numeric',month:'short'})}</div>
+      </div>
+      ${log.notes ? `<div class="history-note">${log.notes}</div>` : ''}
+      ${photoRow}
+    `;
+    item.onclick = () => openDayDetail(key, day);
+    list.appendChild(item);
+  });
+}
+
+// ── Day Detail Modal ──────────────────────────────────────────────────────────
+function openDayDetail(key, day) {
+  const log = state.logs[key] || {};
+  const d = new Date(key);
+  const phase = phaseFor(day);
+
+  document.getElementById('modal-title').textContent = `Day ${day || '?'} — ${d.toLocaleDateString('en-GB', {day:'numeric',month:'long'})}`;
+
+  let body = '';
+  if (log.checkedIn) body += `<div style="margin-bottom:12px;"><span class="tag tag-lgd">✓ Checked in</span> <span style="font-size:11px;color:var(--text3);margin-left:8px;">${log.checkinTime ? new Date(log.checkinTime).toLocaleTimeString() : ''}</span></div>`;
+  if (log.doses) {
+    body += `<div style="margin-bottom:12px;font-size:12px;color:var(--text2);">`;
+    Object.entries(log.doses).forEach(([c, taken]) => {
+      body += `<div>${taken ? '✓' : '✗'} ${c}</div>`;
+    });
+    body += `</div>`;
+  }
+  if (log.notes) body += `<div style="margin-bottom:12px;"><div class="section-title" style="font-size:12px;margin-bottom:6px;">Notes</div><div class="modal-note">${log.notes.replace(/\n/g,'<br>')}</div></div>`;
+  const photos = log.photos || [];
+  if (photos.length) {
+    body += `<div class="section-title" style="font-size:12px;margin-bottom:8px;">Photos (${photos.length})</div><div class="modal-photo-grid">${photos.map(src=>`<div class="modal-photo"><img src="${src}"></div>`).join('')}</div>`;
+  }
+  if (!body) body = `<div style="color:var(--text3);font-size:12px;">No log data for this day.</div>`;
+
+  document.getElementById('modal-body').innerHTML = body;
+  document.getElementById('detail-modal').classList.add('open');
+}
+
+function closeModal(e) {
+  if (e.target.id === 'detail-modal') closeModalBtn();
+}
+function closeModalBtn() {
+  document.getElementById('detail-modal').classList.remove('open');
+}
+
+// ── Settings ──────────────────────────────────────────────────────────────────
+function saveStartDate() {
+  const val = document.getElementById('start-date-input').value;
+  if (!val) return;
+  state.startDate = val;
+  saveState();
+  showToast('📅', 'Start date saved!');
+  showPage('today');
+  renderToday();
+}
+
+function exportData() {
+  const blob = new Blob([JSON.stringify(state, null, 2)], {type: 'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'cycle-log.json';
+  a.click();
+}
+
+function clearData() {
+  if (confirm('Clear all log data? This cannot be undone.')) {
+    state = { startDate: null, logs: {} };
+    saveState();
+    location.reload();
+  }
+}
+
+// ── Page navigation ───────────────────────────────────────────────────────────
+function showPage(page) {
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+  document.getElementById(`page-${page}`).classList.add('active');
+  document.querySelector(`[onclick="showPage('${page}')"]`).classList.add('active');
+
+  if (page === 'calendar') renderCalendar();
+  if (page === 'history') renderHistory();
+  if (page === 'settings') {
+    if (state.startDate) document.getElementById('start-date-input').value = state.startDate;
+  }
+}
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+function showToast(icon, text) {
+  document.getElementById('toast-icon').textContent = icon;
+  document.getElementById('toast-text').textContent = text;
+  const t = document.getElementById('toast');
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+function dismissToast() {
+  document.getElementById('toast').classList.remove('show');
+}
+
+// ── Reminder check ─────────────────────────────────────────────────────────────
+function checkReminder() {
+  const key = todayKey();
+  const log = state.logs[key] || {};
+  const hour = new Date().getHours();
+  if (!log.checkedIn && hour >= 8 && state.startDate) {
+    setTimeout(() => showToast('💊', "Don't forget your daily dose & check-in!"), 2000);
+  }
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────────
+loadState();
+renderToday();
+checkReminder();
+</script>
+</body>
+</html>
